@@ -68,7 +68,7 @@ def _fallback_save_turn(
                 f"{user_message[:80]}..."
             )
 
-        if assistant_message and assistant_message.strip():
+        elif assistant_message and assistant_message.strip():
             assistant_transcript = AppMmNotebookLlmChatTranscriptCreate(
                 user_guid=UUID(user_guid),
                 llm_chat_hdr_guid=UUID(llm_chat_hdr_guid),
