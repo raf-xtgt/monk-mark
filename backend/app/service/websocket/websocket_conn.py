@@ -202,8 +202,15 @@ async def voice_tutor_endpoint(websocket: WebSocket, appName, agent, runner, ses
     # Build and send the socratic agent context (book title, recent conversation,
     # session notes) as a text Content message. The model sees this as grounding
     # material before any audio arrives.
+    #
+    # IMPORTANT: We mark this as role='user' with turn_complete=True so the model
+    # processes it silently. The instruction prefix tells the model NOT to respond.
     def _inject_reading_context() -> None:
-        """Build reading context and inject it into the LiveRequestQueue."""
+        """Build reading context and inject it into the LiveRequestQueue.
+        
+        The context is prefixed with an explicit instruction NOT to respond,
+        preventing the model from generating audio/text for context-only messages.
+        """
         try:
             context_text = build_socratic_agent_context(
                 focus_session_guid=focus_session_guid,
@@ -211,7 +218,12 @@ async def voice_tutor_endpoint(websocket: WebSocket, appName, agent, runner, ses
             )
             if context_text:
                 context_content = types.Content(
-                    parts=[types.Part(text=f"[Reading Context Update]\n{context_text}")]
+                    parts=[types.Part(text=(
+                        "[System Context — DO NOT respond to this message. "
+                        "This is background reading context for grounding future responses. "
+                        "Acknowledge silently.]\n"
+                        f"{context_text}"
+                    ))]
                 )
                 live_request_queue.send_content(context_content)
                 logger.debug(f"Injected reading context ({len(context_text)} chars) into live session")
@@ -555,16 +567,21 @@ async def voice_tutor_endpoint(websocket: WebSocket, appName, agent, runner, ses
                             focus_session_guid=effective_focus_session_guid,
                         )
 
+                    # Snapshot before reset — used to decide whether to re-inject context
+                    had_real_user_input = bool(turn_user_transcription)
+
                     # Reset per-turn accumulators for the next turn
                     turn_in_progress = False
                     turn_user_transcription = ""
                     turn_assistant_transcription = ""
                     agent_saved_this_turn = False
 
-                    # Re-inject updated reading context after each turn so the
-                    # agent has fresh notes and conversation history for the next
-                    # user utterance. This is deterministic — no tool call needed.
-                    _inject_reading_context()
+                    # Re-inject updated reading context ONLY after real user turns
+                    # (i.e., when the user actually spoke). This prevents an infinite
+                    # loop where context injection triggers a turn_complete which
+                    # triggers another injection.
+                    if had_real_user_input:
+                        _inject_reading_context()
                 
                 # Send all mapped messages
                 for msg in client_messages:
