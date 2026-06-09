@@ -15,18 +15,15 @@ from controller.notebook.app_mm_notebook_llm_chat_hdr_controller import router a
 from controller.notebook.app_mm_notebook_llm_chat_transcript_controller import router as notebook_llm_chat_transcript_router
 from controller.file.app_mm_file_upload_controller import router as file_upload_router
 from controller.focus_session.app_mm_focus_session_controller import router as focus_session_router
-from controller.library.app_mm_library_llm_quote_controller import router as library_llm_quote_router
 from controller.context.context_controller import router as context_router
 from controller.agent_trigger.agent_trigger_controller import router as agent_trigger_router
 from controller.reward.app_mm_reward_hdr_controller import router as reward_hdr_router
 from controller.dashboard.dashboard_controller import router as dashboard_router
 from controller.reward.app_mm_reward_line_controller import router as reward_line_router
-from controller.gitlab_sync_log.app_mm_gitlab_sync_log_controller import router as gitlab_sync_log_router
 from service.websocket.websocket_conn import voice_tutor_endpoint
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from service.agents.socratic_dialogue_agent.agent import socratic_dialogue_agent
-from service.agents.cron_scheduler import mantra_cron_loop
 
 load_dotenv()
 
@@ -77,7 +74,6 @@ APP_NAME_TEXT = "monk-mark-text"
 text_session_service = InMemorySessionService()
 from service.agents.art_generator_agent.agent import art_generator_agent as _art_agent
 from service.agents.art_generator_agent.agent import art_evolution_agent as _art_evolution_agent
-from service.agents.mantra_generator_agent.agent import mantra_generator_agent as _mantra_agent
 from service.agents.gitlab_agent.agent import gitlab_agent as _gitlab_agent
 from service.agents.gitlab_agent.agent_v2 import gitlab_agent_v2 as _gitlab_agent_v2
 from service.agents.note_taking_agent.agent import note_taking_agent as _note_taking_agent
@@ -92,7 +88,6 @@ def _build_text_runner(agent, app_name_suffix: str) -> Runner:
 
 text_runners["generate_art"] = _build_text_runner(_art_agent, "art")
 text_runners["generate_art_evolution"] = _build_text_runner(_art_evolution_agent, "art-evolution")
-text_runners["generate_mantra"] = _build_text_runner(_mantra_agent, "mantra")
 text_runners["gitlab_doc"] = _build_text_runner(_gitlab_agent, "gitlab")
 text_runners["gitlab_doc_v2"] = _build_text_runner(_gitlab_agent_v2, "gitlab-v2")
 text_runners["note_taking"] = _build_text_runner(_note_taking_agent, "note-taking")
@@ -127,13 +122,11 @@ app.include_router(notebook_llm_chat_hdr_router, prefix=url_prefix)
 app.include_router(notebook_llm_chat_transcript_router, prefix=url_prefix)
 app.include_router(file_upload_router, prefix=url_prefix)
 app.include_router(focus_session_router, prefix=url_prefix)
-app.include_router(library_llm_quote_router, prefix=url_prefix)
 app.include_router(context_router, prefix=url_prefix)
 app.include_router(agent_trigger_router, prefix=url_prefix)
 app.include_router(reward_hdr_router, prefix=url_prefix)
 app.include_router(dashboard_router, prefix=url_prefix)
 app.include_router(reward_line_router, prefix=url_prefix)
-app.include_router(gitlab_sync_log_router, prefix=url_prefix)
 
 logger.info(f"All routers registered with prefix: {url_prefix}")
 

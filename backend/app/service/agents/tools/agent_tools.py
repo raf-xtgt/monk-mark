@@ -5,11 +5,9 @@ import logging
 from uuid import UUID
 
 from service.notebook.app_mm_notebook_llm_chat_transcript_service import NotebookLlmChatTranscriptService
-from service.library.app_mm_library_llm_quote_service import AppMmLibraryLlmQuoteService
 from service.file.app_mm_file_upload_service import AppMmFileUploadService
 
 from model.notebook.app_mm_notebook_llm_chat_transcript import AppMmNotebookLlmChatTranscriptCreate
-from model.library.app_mm_library_llm_quote import AppMmLibraryLlmQuoteCreate
 from model.file.app_mm_file_upload import AppMmFileUploadCreate
 
 logger = logging.getLogger(__name__)
@@ -40,30 +38,6 @@ def save_chat_transcript(user_guid: str, llm_chat_hdr_guid: str, msg_content: st
         return {"status": "success", "data": result.model_dump(mode="json")}
     except Exception as e:
         logger.error(f"save_chat_transcript error: {e}", exc_info=True)
-        return {"status": "error", "error_type": type(e).__name__, "message": str(e)}
-
-
-def save_llm_quote(user_guid: str, library_hdr_guid: str, text_content: str) -> dict:
-    """Persists a generated mantra/quote to the library LLM quote table.
-
-    Args:
-        user_guid: The UUID of the user.
-        library_hdr_guid: The UUID of the library header (book).
-        text_content: The generated quote text.
-
-    Returns:
-        dict with 'status' and either 'data' (created record) or error details.
-    """
-    try:
-        data = AppMmLibraryLlmQuoteCreate(
-            user_guid=UUID(user_guid),
-            llibrary_hdr_guid=UUID(library_hdr_guid),
-            text_content=text_content,
-        )
-        result = AppMmLibraryLlmQuoteService.create_quote(data)
-        return {"status": "success", "data": result.model_dump(mode="json")}
-    except Exception as e:
-        logger.error(f"save_llm_quote error: {e}", exc_info=True)
         return {"status": "error", "error_type": type(e).__name__, "message": str(e)}
 
 
