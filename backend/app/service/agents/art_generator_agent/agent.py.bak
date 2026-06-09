@@ -1,0 +1,389 @@
+# backend/app/service/agents/art_generator_agent/agent.py
+# Source: adk-local-docs/docs/agents/workflow-agents/sequential-agents.md
+# Source: adk-local-docs/docs/agents/workflow-agents/loop-agents.md
+#
+# Legacy Art Generation System — Multi-agent pipeline that transforms reading
+# reflections into animated visual metaphors using a hierarchical architecture:
+#   SynthesisAgent → LoopAgent(ImagingAgent → MotionAgent, ArtCriticAgent) → StorageAgent
+
+import os
+import logging
+
+from google.adk.agents import LlmAgent, SequentialAgent, LoopAgent
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.tools import ToolContext
+
+from service.agents.tools.reading_context_tool import build_reading_context
+from service.agents.tools.legacy_art_imaging_tool import generate_legacy_art_image as _generate_image_raw
+from service.agents.tools.legacy_art_motion_tool import generate_legacy_art_animation as _generate_animation_raw
+from service.agents.tools.agent_tools import upload_file_to_storage
+
+logger = logging.getLogger(__name__)
+
+# --- Constants ---
+SYNTHESIS_MODEL = os.getenv("SYNTHESIS_MODEL", "gemini-2.5-flash")
+IMAGING_MODEL = os.getenv(
+    "IMAGING_MODEL", "gemini-2.5-flash"
+)
+MOTION_MODEL = os.getenv(
+    "MOTION_MODEL", "gemini-2.5-flash"
+)
+CRITIC_MODEL = os.getenv("CRITIC_MODEL", "gemini-2.5-flash")
+STORAGE_MODEL = os.getenv(
+    "STORAGE_MODEL", "gemini-2.5-flash"
+)
+
+# --- State Keys ---
+STATE_QUIZ_EVALUATION = "quiz_evaluation"
+STATE_VISUAL_METAPHOR_PROMPT = "visual_metaphor_prompt"
+STATE_GENERATED_IMAGE = "generated_image"           # Lightweight status only
+STATE_IMAGE_BASE64 = "image_base64_data"            # Raw base64 stored separately (not injected into prompts)
+STATE_GENERATED_ANIMATION = "generated_animation"   # Lightweight status only
+STATE_VIDEO_BASE64 = "video_base64_data"            # Raw base64 stored separately
+STATE_ART_CRITIQUE = "art_critique"
+
+# Completion signal for the critic
+COMPLETION_PHRASE = "APPROVED: Quality threshold met."
+
+
+# --- Wrapper Tools (store heavy base64 in state, return lightweight status) ---
+def generate_art_image(prompt: str, tool_context: ToolContext) -> dict:
+    """Generates a high-resolution surrealist digital painting from a visual metaphor prompt.
+
+    Calls the image generation API and stores the base64 image data in session state
+    for downstream tools. Returns only a lightweight status to avoid token overflow.
+
+    Args:
+        prompt: A detailed visual metaphor description for the artwork to generate.
+        tool_context: ADK ToolContext (auto-injected) for session state access.
+
+    Returns:
+        dict with 'status' and generation details (without the raw base64 data).
+    """
+    result = _generate_image_raw(prompt)
+    if result["status"] == "success":
+        # Store heavy base64 in state — NOT in the agent's output_key
+        tool_context.state["image_base64_data"] = result["image_base64"]
+        return {
+            "status": "success",
+            "mime_type": result["mime_type"],
+            "message": "Image generated successfully. Base64 data stored in session state key 'image_base64_data'.",
+        }
+    return result
+
+
+def generate_art_animation(prompt: str, tool_context: ToolContext) -> dict:
+    """Animates a static artwork into a subtle, looping 5-second cinemagraph.
+
+    Reads the image base64 from session state, generates the animation, and stores
+    the video base64 in session state. Returns only a lightweight status.
+
+    Args:
+        prompt: Animation direction describing the desired motion effects.
+        tool_context: ADK ToolContext (auto-injected) for session state access.
+
+    Returns:
+        dict with 'status' and generation details (without the raw base64 data).
+    """
+    image_base64 = tool_context.state.get("image_base64_data", "")
+    if not image_base64:
+        return {
+            "status": "error",
+            "error_type": "MissingImageData",
+            "message": "No image_base64_data found in session state. Generate an image first.",
+        }
+    result = _generate_animation_raw(image_base64=image_base64, prompt=prompt)
+    if result["status"] == "success":
+        # Store heavy base64 in state — NOT in the agent's output_key
+        tool_context.state["video_base64_data"] = result["video_base64"]
+        return {
+            "status": "success",
+            "mime_type": result["mime_type"],
+            "message": "Animation generated successfully. Base64 data stored in session state key 'video_base64_data'.",
+        }
+    return result
+
+
+# --- Exit Loop Tool ---
+def exit_loop(tool_context: ToolContext):
+    """Call this function ONLY when the art critique indicates the artwork meets quality standards and no further iterations are needed."""
+    logger.info(
+        f"[exit_loop] Triggered by {tool_context.agent_name} — ending refinement loop."
+    )
+    tool_context.actions.escalate = True
+    tool_context.actions.skip_summarization = True
+    return {}
+
+
+# --- Before Agent Callback ---
+# NOTE: Hardcoded to always pass with score 5.0 for testing (no quiz implementation yet).
+# Production version backed up in: service/agents/tools/validate_quiz_score_tool.py
+def validate_quiz_score(callback_context: CallbackContext):
+    """Bypasses quiz validation for testing — always sets composite_score to 5.0."""
+    callback_context.state["pipeline_blocked"] = False
+    callback_context.state["composite_score"] = 5.0
+    return None
+
+
+# --- 1. Synthesis Agent ---
+# Extracts core emotional metaphors from the user's reading journey and quiz performance,
+# then outputs a detailed visual prompt for the imaging stage.
+synthesis_agent = LlmAgent(
+    name="SynthesisAgent",
+    model=SYNTHESIS_MODEL,
+    description="Extracts core emotional metaphors from user reading logs and synthesizes a visual art prompt.",
+    instruction="""You are the Metaphor Synthesis engine for MonkMark's Legacy Art system.
+
+Your task is to analyze the user's reading journey and transform it into a powerful visual metaphor
+that can be rendered as a high-fidelity digital painting.
+
+**Input available in session state:**
+- Reading context will be provided via the build_reading_context tool
+- Quiz evaluation quality is stored in state as 'composite_score'
+
+**Session identifiers (use these EXACT values when calling tools):**
+- user_guid: {user_guid}
+- library_hdr_guid: {library_hdr_guid}
+- notebook_hdr_guid: {notebook_hdr_guid}
+- llm_chat_hdr_guid: {llm_chat_hdr_guid}
+
+**Process:**
+1. Call build_reading_context with user_guid="{user_guid}", library_hdr_guid="{library_hdr_guid}", notebook_hdr_guid="{notebook_hdr_guid}", llm_chat_hdr_guid="{llm_chat_hdr_guid}".
+2. Analyze the reading context for:
+   - Core themes and philosophical ideas from the book
+   - Emotional resonance in the user's highlights and notes
+   - Depth of engagement revealed by the quiz composite_score ({composite_score?})
+   - Recurring symbols or imagery in the user's reflections
+3. Synthesize a SINGLE powerful visual metaphor that represents the user's intellectual growth.
+4. Output a detailed descriptive prompt (200-400 words) for a high-fidelity surrealist digital painting.
+
+**Prompt requirements:**
+- Describe composition, color palette, lighting, mood, and symbolic elements
+- Include specific artistic style references (surrealism, magical realism, etc.)
+- Mention texture and material qualities (oil paint, luminescent, ethereal, etc.)
+- Incorporate at least one element directly tied to the book's themes
+- Include at least one element representing the user's personal growth/reflection
+
+Output ONLY the image generation prompt. No explanations or preamble.""",
+    tools=[build_reading_context],
+    output_key=STATE_VISUAL_METAPHOR_PROMPT,
+)
+
+
+# --- 2a. Imaging Agent (Inside Refinement Loop) ---
+# Generates high-resolution static artwork from the synthesis prompt.
+imaging_agent = LlmAgent(
+    name="ImagingAgent",
+    model=IMAGING_MODEL,
+    description="Generates high-resolution surrealist artwork from a visual metaphor prompt.",
+    instruction="""You are the Imaging Agent for MonkMark's Legacy Art system.
+
+**Your task:** Generate a high-resolution digital painting based on the visual metaphor prompt.
+
+**Visual Metaphor Prompt:**
+{visual_metaphor_prompt}
+
+**Instructions:**
+1. Take the visual metaphor prompt above and call the generate_art_image tool with it.
+2. If the tool returns successfully, output a brief confirmation (e.g., "Image generated successfully").
+3. If the tool returns an error, report the error clearly.
+
+Output ONLY a brief status message. Do NOT include any base64 data in your output.""",
+    tools=[generate_art_image],
+    output_key=STATE_GENERATED_IMAGE,
+)
+
+
+# --- 2b. Motion Agent (Inside Refinement Loop) ---
+# Animates the static artwork into a looping cinemagraph.
+motion_agent = LlmAgent(
+    name="MotionAgent",
+    model=MOTION_MODEL,
+    description="Animates static artwork into a subtle looping cinemagraph using Veo.",
+    instruction="""You are the Motion Agent for MonkMark's Legacy Art system.
+
+**Your task:** Animate the generated static artwork into a subtle, looping 5-second cinemagraph.
+
+**Visual Metaphor Context:**
+{visual_metaphor_prompt}
+
+**Image Generation Status:**
+{generated_image}
+
+**Instructions:**
+1. The image base64 data is already stored in session state (handled automatically by the tool).
+2. Craft an animation direction prompt that describes subtle, atmospheric motion appropriate
+   to the visual metaphor (e.g., 'gentle light particles drifting upward, soft atmospheric haze
+   pulsing, subtle color temperature shifts in the background').
+3. Call generate_art_animation with ONLY your animation prompt. The tool reads the image from state automatically.
+4. If successful, confirm the animation was generated. If it fails, report the error.
+
+**Animation style guidelines:**
+- Keep motion SUBTLE — this is a cinemagraph, not a full animation
+- Focus on atmospheric elements: light, particles, fog, reflections, gentle movement
+- Avoid large-scale motion or character animation
+- The loop should feel seamless and meditative
+
+Output ONLY a brief status message. Do NOT include any base64 data in your output.""",
+    tools=[generate_art_animation],
+    output_key=STATE_GENERATED_ANIMATION,
+)
+
+
+# --- 2c. Art Critic Agent (Inside Refinement Loop) ---
+# Evaluates the generated artwork against the original metaphor and quality standards.
+critic_agent = LlmAgent(
+    name="ArtCriticAgent",
+    model=CRITIC_MODEL,
+    description="Evaluates generated artwork for aesthetic quality and metaphor adherence.",
+    instruction=f"""You are the Art Critic for MonkMark's Legacy Art quality control system.
+
+**Your task:** Evaluate the generated artwork and animation against the original visual metaphor.
+
+**Original Visual Metaphor Prompt:**
+{{visual_metaphor_prompt}}
+
+**Image Generation Status:**
+{{generated_image}}
+
+**Animation Generation Status:**
+{{generated_animation}}
+
+**Evaluation Criteria (ALL must be met for approval):**
+1. **Metaphor Adherence:** The visual metaphor prompt is well-suited for artistic rendering
+2. **Technical Success:** Both image and animation status messages indicate 'success'
+3. **Pipeline Integrity:** No error messages in either generation step
+
+**Task:**
+Evaluate against all criteria above.
+
+IF any generation step reported an error status, provide specific feedback on what failed and suggest
+the metaphor prompt should be simplified for regeneration.
+
+IF all criteria are met and both steps succeeded, respond EXACTLY with:
+"{COMPLETION_PHRASE}"
+
+IF criteria are NOT fully met but no errors occurred, provide specific constructive feedback
+on what to adjust in the visual metaphor prompt for the next iteration.
+
+Either output your critique/feedback OR the exact approval phrase. Nothing else.""",
+    tools=[exit_loop],
+    output_key=STATE_ART_CRITIQUE,
+)
+
+
+# --- 2d. Refiner Agent (Inside Refinement Loop) ---
+# Either exits the loop on approval or refines the metaphor prompt for re-generation.
+refiner_agent = LlmAgent(
+    name="ArtRefinerAgent",
+    model=IMAGING_MODEL,
+    description="Refines the visual metaphor prompt based on critic feedback or exits the loop on approval.",
+    instruction=f"""You are the Art Refiner for MonkMark's Legacy Art system.
+
+**Current Visual Metaphor Prompt:**
+{{visual_metaphor_prompt}}
+
+**Art Critique:**
+{{art_critique}}
+
+**Task:**
+Analyze the art critique.
+
+IF the critique is EXACTLY "{COMPLETION_PHRASE}":
+    You MUST call the 'exit_loop' function immediately. Do not output any text.
+
+ELSE (the critique contains actionable feedback):
+    Refine the visual metaphor prompt to address the critic's feedback.
+    Output ONLY the refined prompt text — no explanations or preamble.
+    Keep the core metaphor intact but adjust composition, style, or detail as suggested.""",
+    tools=[exit_loop],
+    output_key=STATE_VISUAL_METAPHOR_PROMPT,
+)
+
+
+# --- 2. Visual Pipeline (Sequential: Image → Motion) ---
+visual_pipeline = SequentialAgent(
+    name="VisualPipeline",
+    description="Generates static artwork then animates it into a cinemagraph.",
+    sub_agents=[imaging_agent, motion_agent],
+)
+
+
+# --- 3. Quality Control Loop ---
+# Iterates: VisualPipeline → Critic → Refiner/Exit
+refinement_loop = LoopAgent(
+    name="ArtRefinementLoop",
+    description="Iteratively generates and refines artwork until quality threshold is met.",
+    sub_agents=[visual_pipeline, critic_agent, refiner_agent],
+    max_iterations=1,
+)
+
+
+# --- 4. Storage Agent ---
+# Persists the final approved artwork to Supabase Storage.
+storage_agent = LlmAgent(
+    name="ArtStorageAgent",
+    model=STORAGE_MODEL,
+    description="Persists the final Legacy Art assets to Supabase Storage.",
+    instruction="""You are the Storage Agent for MonkMark's Legacy Art system.
+
+**Your task:** Upload the final approved artwork to Supabase Storage and return the public URL.
+
+**Generation Status:**
+- Image: {generated_image}
+- Animation: {generated_animation}
+
+**Instructions:**
+1. Read user_guid from session state: {user_guid}
+2. The base64 data for the assets is stored in session state keys 'video_base64_data' and 'image_base64_data'.
+   Pass the appropriate state key name to upload_file_to_storage.
+3. Upload the animated cinemagraph (if animation succeeded) using upload_file_to_storage:
+   - file_name: 'legacy_art.mp4'
+   - mime_type: 'video/mp4'
+   - storage_path: '{user_guid}/legacy_art/'
+   - bucket_name: from environment or default 'monk-mark-storage'
+4. If animation is not available but image succeeded, upload the static image instead:
+   - file_name: 'legacy_art.png'
+   - mime_type: 'image/png'
+   - storage_path: '{user_guid}/legacy_art/'
+   - bucket_name: from environment or default 'monk-mark-storage'
+5. Return the storage path/URL of the uploaded asset.
+
+Output the final asset URL or storage path as a JSON object:
+{{"status": "success", "asset_url": "...", "asset_type": "animation|image"}}""",
+    tools=[upload_file_to_storage],
+    output_key="pixel_art_url",
+)
+
+
+# --- 5. Gate Agent ---
+# Checks if the pipeline should run or return an encouragement message.
+gate_agent = LlmAgent(
+    name="ArtGateAgent",
+    model=IMAGING_MODEL,
+    description="Checks quiz eligibility before running the art generation pipeline.",
+    instruction="""You are the gate check for MonkMark's Legacy Art system.
+
+Check session state for 'pipeline_blocked'.
+
+IF pipeline_blocked is True:
+    Read 'block_reason' from session state and relay that message to the user warmly.
+    Do NOT proceed with art generation.
+
+IF pipeline_blocked is False or not set:
+    Respond with exactly: "PROCEED"
+    This signals the pipeline to continue with art generation.
+
+Output only the encouragement message OR "PROCEED". Nothing else.""",
+    output_key="gate_decision",
+)
+
+
+# --- 6. Root Art Generator Agent (SequentialAgent) ---
+# Orchestrates the full pipeline: Gate → Synthesis → Refinement Loop → Storage
+art_generator_agent = SequentialAgent(
+    name="art_generator_agent",
+    description="Generates unique Legacy Art rewards based on the user's reading journey and quiz performance. Uses a multi-agent pipeline: metaphor synthesis → iterative image/animation generation with quality control → storage.",
+    sub_agents=[gate_agent, synthesis_agent, refinement_loop, storage_agent],
+    before_agent_callback=validate_quiz_score,
+)
