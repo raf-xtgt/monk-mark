@@ -85,6 +85,74 @@ def get_transcripts_by_notebook(payload: NotebookChatTranscriptDto):
     
     return ApiResponse.success(response)
 
+@router.get("/count-by-notebook/{notebook_hdr_guid}", response_model=ApiResponse[dict])
+def count_transcripts_by_notebook(notebook_hdr_guid: UUID):
+    """Get the total count of transcripts for a given notebook_hdr_guid"""
+    from service.notebook.app_mm_notebook_llm_chat_hdr_service import NotebookLlmChatHdrService
+
+    try:
+        chat_hdrs = NotebookLlmChatHdrService.get_chat_hdrs_by_notebook(notebook_hdr_guid)
+
+        if not chat_hdrs:
+            return ApiResponse.success({"notebook_hdr_guid": str(notebook_hdr_guid), "total_count": 0})
+
+        total_count = 0
+        for chat_hdr in chat_hdrs:
+            total_count += NotebookLlmChatTranscriptService.count_transcripts_by_chat_hdr(chat_hdr.guid)
+
+        return ApiResponse.success({"notebook_hdr_guid": str(notebook_hdr_guid), "total_count": total_count})
+    except Exception as e:
+        return ApiResponse.error({"message": str(e)})
+
+@router.post("/generate-greeting", response_model=ApiResponse[AppMmNotebookLlmChatTranscriptResponse], status_code=status.HTTP_201_CREATED)
+def generate_greeting(payload: NotebookChatTranscriptDto):
+    """Generate and persist a greeting message as the first assistant message for a new chat session.
+
+    Looks up the book title from library_hdr_guid and creates a short thematic
+    greeting. The greeting is persisted to the transcript table and returned.
+    """
+    from service.notebook.app_mm_notebook_llm_chat_hdr_service import NotebookLlmChatHdrService
+    from model.notebook.app_mm_notebook_llm_chat_hdr import AppMmNotebookLlmChatHdrCreate
+    from service.library.app_mm_library_hdr_service import AppMmLibraryHdrService
+
+    try:
+        # Get or create chat header
+        chat_hdrs = NotebookLlmChatHdrService.get_chat_hdrs_by_notebook(payload.notebook_hdr_guid)
+
+        if not chat_hdrs:
+            new_chat_hdr = AppMmNotebookLlmChatHdrCreate(
+                user_guid=payload.user_guid,
+                notebook_hdr_guid=payload.notebook_hdr_guid,
+                library_hdr_guid=payload.library_hdr_guid
+            )
+            created_chat_hdr = NotebookLlmChatHdrService.create_chat_hdr(new_chat_hdr)
+            chat_hdr_guid = created_chat_hdr.guid
+        else:
+            chat_hdr_guid = chat_hdrs[0].guid
+
+        # Look up book title
+        book_title = None
+        if payload.library_hdr_guid:
+            book_title = AppMmLibraryHdrService.get_book_title(payload.library_hdr_guid)
+
+        # Generate greeting based on book title
+        if book_title:
+            greeting = f"Ready to explore \"{book_title}\" together. What's on your mind?"
+        else:
+            greeting = "Ready to dive into your reading. What's on your mind?"
+
+        # Persist greeting as the first assistant message
+        transcript_data = AppMmNotebookLlmChatTranscriptCreate(
+            user_guid=payload.user_guid,
+            llm_chat_hdr_guid=chat_hdr_guid,
+            msg_content=greeting,
+            sender="assistant",
+        )
+        result = NotebookLlmChatTranscriptService.create_transcript(transcript_data)
+        return ApiResponse.success(result)
+    except Exception as e:
+        return ApiResponse.error({"message": str(e)})
+
 
 @router.put("/update/{transcript_id}", response_model=ApiResponse[AppMmNotebookLlmChatTranscriptResponse])
 def update_transcript(transcript_id: UUID, transcript: AppMmNotebookLlmChatTranscriptUpdate):

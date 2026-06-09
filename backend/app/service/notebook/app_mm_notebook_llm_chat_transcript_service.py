@@ -62,6 +62,17 @@ class NotebookLlmChatTranscriptService:
         return [AppMmNotebookLlmChatTranscriptResponse(**transcript) for transcript in response.data]
     
     @staticmethod
+    def count_transcripts_by_chat_hdr(llm_chat_hdr_guid: UUID) -> int:
+        """Count total transcripts for a specific chat header"""
+        response = (
+            supabase.table(NotebookLlmChatTranscriptService.TABLE_NAME)
+            .select("guid", count="exact")
+            .eq("llm_chat_hdr_guid", str(llm_chat_hdr_guid))
+            .execute()
+        )
+        return response.count if response.count is not None else 0
+
+    @staticmethod
     def get_transcripts_by_notebook(notebook_hdr_guid: UUID, llm_chat_hdr_guid: UUID) -> List[AppMmNotebookLlmChatTranscriptResponse]:
         """Get all notebook LLM chat transcripts for a specific notebook via chat header"""
         response = supabase.table(NotebookLlmChatTranscriptService.TABLE_NAME).select("*").eq("llm_chat_hdr_guid", str(llm_chat_hdr_guid)).order("created_date").execute()
