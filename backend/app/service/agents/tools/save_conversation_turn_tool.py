@@ -73,7 +73,7 @@ def save_conversation_turn(
             )
 
         # Save assistant message
-        if assistant_message and assistant_message.strip():
+        elif assistant_message and assistant_message.strip():
             assistant_transcript = AppMmNotebookLlmChatTranscriptCreate(
                 user_guid=UUID(user_guid),
                 llm_chat_hdr_guid=UUID(llm_chat_hdr_guid),
