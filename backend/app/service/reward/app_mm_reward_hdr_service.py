@@ -378,7 +378,7 @@ class AppMmRewardHdrService:
         }
 
     @staticmethod
-    async def simulate_reward_flow(
+    def simulate_reward_flow(
         user_guid: UUID,
         library_hdr_guid: UUID,
         tier_level: int,
@@ -569,36 +569,7 @@ class AppMmRewardHdrService:
             total_focus_hours=summary.total_focused_hrs,
             total_notes_taken=summary.total_notes,
         )
-
-        # --- Step 6: Trigger GitLab agent with reading context ---
-        gitlab_agent_result = None
-        if last_focus_session_guid:
-            try:
-                from service.agent_trigger.agent_trigger_service import AgentTriggerService
-
-                gitlab_result = await AgentTriggerService.trigger_gitlab_agent(
-                    user_guid=user_guid,
-                    library_hdr_guid=library_hdr_guid,
-                    focus_session_guid=last_focus_session_guid,
-                )
-
-                gitlab_agent_result = {
-                    "session_id": gitlab_result.session_id,
-                    "responses": gitlab_result.responses,
-                    "gitlab_output": {
-                        "issue_result": gitlab_result.gitlab_output.issue_result if gitlab_result.gitlab_output else None,
-                        "issue_url": gitlab_result.gitlab_output.issue_url if gitlab_result.gitlab_output else None,
-                        "branch_result": gitlab_result.gitlab_output.branch_result if gitlab_result.gitlab_output else None,
-                        "mr_result": gitlab_result.gitlab_output.mr_result if gitlab_result.gitlab_output else None,
-                        "visual_motif_result": gitlab_result.gitlab_output.visual_motif_result if gitlab_result.gitlab_output else None,
-                    } if gitlab_result.gitlab_output else None,
-                }
-            except Exception as gitlab_err:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"GitLab agent trigger failed during simulation: {gitlab_err}", exc_info=True)
-                gitlab_agent_result = {"error": str(gitlab_err)}
-
+        
         return {
             "user_guid": str(user_guid),
             "library_hdr_guid": str(library_hdr_guid),
@@ -614,7 +585,6 @@ class AppMmRewardHdrService:
             "target_hours": round(target_hours, 2),
             "target_notes": target_notes,
             "evaluation": evaluation.model_dump(),
-            "gitlab_agent_result": gitlab_agent_result,
         }
 
 # TODO: helper method for the simulation endpoint

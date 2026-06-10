@@ -182,7 +182,7 @@ async def simulate_rewards(payload: RewardSimulationDto):
     """
     try:
         # Step 1-4: Generate test data and evaluate
-        sim_result = await AppMmRewardHdrService.simulate_reward_flow(
+        sim_result = AppMmRewardHdrService.simulate_reward_flow(
             user_guid=payload.user_guid,
             library_hdr_guid=payload.library_guid,
             tier_level=payload.tier_level,
@@ -306,6 +306,30 @@ async def simulate_rewards(payload: RewardSimulationDto):
             "agent_result": agent_result,
             "reward_hdr_created": reward_hdr_created,
             "reward_line_created": reward_line_created,
+        })
+    except Exception as e:
+        return ApiResponse.error({"message": str(e)})
+
+@router.post("/simulate-milestone", response_model=ApiResponse[dict], status_code=status.HTTP_201_CREATED)
+async def simulate_milestone(payload: RewardSimulationDto):
+    """Simulate milestone progression without triggering art agents or creating reward records.
+
+    Creates notebook/notes/focus sessions, evaluates milestone progression,
+    and triggers the GitLab agent — but does NOT trigger ART_GEN/ART_EVOLUTION
+    and does NOT create reward_hdr or reward_line records.
+
+    Input: RewardSimulationDto with user_guid, library_guid, tier_level, progress_type.
+    """
+    try:
+        sim_result = await AppMmRewardHdrService.simulate_reward_flow(
+            user_guid=payload.user_guid,
+            library_hdr_guid=payload.library_guid,
+            tier_level=payload.tier_level,
+            progress_type=payload.progress_type,
+        )
+
+        return ApiResponse.success({
+            "simulation": sim_result,
         })
     except Exception as e:
         return ApiResponse.error({"message": str(e)})
