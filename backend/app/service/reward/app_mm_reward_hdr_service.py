@@ -418,7 +418,39 @@ class AppMmRewardHdrService:
             target_hours = float(h_target)
             target_notes = n_target
 
-        # --- Step 1: Ensure notebook_hdr exists ---
+        # --- Step 1: Create focus sessions first (so we have focus_session_guid for downstream records) ---
+        existing_focus = supabase.table(AppMmRewardHdrService.FOCUS_SESSION_TABLE).select(
+            "time_hrs, time_seconds"
+        ).eq("library_hdr_guid", str(library_hdr_guid)).execute()
+
+        existing_hrs = 0.0
+        for session in existing_focus.data:
+            if session.get("time_hrs"):
+                try:
+                    existing_hrs += float(session["time_hrs"])
+                except (ValueError, TypeError):
+                    pass
+            if session.get("time_seconds"):
+                existing_hrs += int(session["time_seconds"]) / 3600.0
+
+        hours_to_add = max(0.0, target_hours - existing_hrs)
+        sessions_created = 0
+        last_focus_session_guid = None
+        remaining_hours = hours_to_add
+        while remaining_hours > 0:
+            chunk_hrs = min(remaining_hours, 1.0)
+            session_data = AppMmFocusSessionCreate(
+                user_guid=user_guid,
+                library_hdr_guid=library_hdr_guid,
+                time_hrs=Decimal(str(round(chunk_hrs, 4))),
+                time_seconds=0,
+            )
+            created_session = AppMmFocusSessionService.create_focus_session(session_data)
+            last_focus_session_guid = created_session.guid
+            sessions_created += 1
+            remaining_hours -= chunk_hrs
+
+        # --- Step 2: Ensure notebook_hdr exists ---
         notebook_hdr_response = supabase.table("app_mm_notebook_hdr").select("*").eq(
             "library_hdr_guid", str(library_hdr_guid)
         ).order("updated_date", desc=True).limit(1).execute()
@@ -438,7 +470,7 @@ class AppMmRewardHdrService:
             notebook_hdr_guid = created_notebook.guid
             notebook_created = True
 
-        # --- Step 2: Create notebook contents as needed ---
+        # --- Step 3: Create notebook contents as needed (with focus_session_guid) ---
         existing_notes_resp = supabase.table(AppMmRewardHdrService.NOTEBOOK_CONTENT_TABLE).select(
             "guid", count="exact"
         ).eq("library_hdr_guid", str(library_hdr_guid)).execute()
@@ -456,13 +488,14 @@ class AppMmRewardHdrService:
                 user_guid=user_guid,
                 notebook_hdr_guid=notebook_hdr_guid,
                 library_hdr_guid=library_hdr_guid,
+                focus_session_guid=last_focus_session_guid,
                 content_text=note_text,
                 sequence_no=seq,
             )
             AppMmNotebookContentService.create_notebook_content(content_data)
             notes_created += 1
 
-        # --- Step 2b: Ensure llm_chat_hdr and transcripts exist ---
+        # --- Step 4: Ensure llm_chat_hdr and transcripts exist (with focus_session_guid) ---
         from model.notebook.app_mm_notebook_llm_chat_hdr import AppMmNotebookLlmChatHdrCreate
         from model.notebook.app_mm_notebook_llm_chat_transcript import AppMmNotebookLlmChatTranscriptCreate
         from service.notebook.app_mm_notebook_llm_chat_hdr_service import NotebookLlmChatHdrService
@@ -504,41 +537,12 @@ class AppMmRewardHdrService:
                     llm_chat_hdr_guid=llm_chat_hdr_guid,
                     msg_content=transcript["msg_content"],
                     sender=transcript["sender"],
+                    focus_session_guid=last_focus_session_guid,
                 )
                 NotebookLlmChatTranscriptService.create_transcript(transcript_data)
                 transcripts_created += 1
 
-        # --- Step 3: Create focus sessions as needed ---
-        existing_focus = supabase.table(AppMmRewardHdrService.FOCUS_SESSION_TABLE).select(
-            "time_hrs, time_seconds"
-        ).eq("library_hdr_guid", str(library_hdr_guid)).execute()
-
-        existing_hrs = 0.0
-        for session in existing_focus.data:
-            if session.get("time_hrs"):
-                try:
-                    existing_hrs += float(session["time_hrs"])
-                except (ValueError, TypeError):
-                    pass
-            if session.get("time_seconds"):
-                existing_hrs += int(session["time_seconds"]) / 3600.0
-
-        hours_to_add = max(0.0, target_hours - existing_hrs)
-        sessions_created = 0
-        remaining_hours = hours_to_add
-        while remaining_hours > 0:
-            chunk_hrs = min(remaining_hours, 1.0)
-            session_data = AppMmFocusSessionCreate(
-                user_guid=user_guid,
-                library_hdr_guid=library_hdr_guid,
-                time_hrs=Decimal(str(round(chunk_hrs, 4))),
-                time_seconds=0,
-            )
-            AppMmFocusSessionService.create_focus_session(session_data)
-            sessions_created += 1
-            remaining_hours -= chunk_hrs
-
-        # --- Step 4: Evaluate milestone ---
+        # --- Step 5: Evaluate milestone ---
         summary = AppMmRewardHdrService.get_reward_summary_by_library(user_guid, library_hdr_guid)
         evaluation = AppMmRewardHdrService.evaluate_milestone_progression(
             tier_level=len(summary.reward_list),
@@ -551,6 +555,7 @@ class AppMmRewardHdrService:
             "library_hdr_guid": str(library_hdr_guid),
             "notebook_hdr_guid": str(notebook_hdr_guid),
             "llm_chat_hdr_guid": str(llm_chat_hdr_guid),
+            "focus_session_guid": str(last_focus_session_guid) if last_focus_session_guid else None,
             "notebook_created": notebook_created,
             "chat_hdr_created": chat_hdr_created,
             "notes_created": notes_created,
