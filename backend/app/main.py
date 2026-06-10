@@ -20,6 +20,7 @@ from controller.agent_trigger.agent_trigger_controller import router as agent_tr
 from controller.reward.app_mm_reward_hdr_controller import router as reward_hdr_router
 from controller.dashboard.dashboard_controller import router as dashboard_router
 from controller.reward.app_mm_reward_line_controller import router as reward_line_router
+from controller.gitlab_sync_log.app_mm_gitlab_sync_log_controller import router as gitlab_sync_log_router
 from service.websocket.websocket_conn import voice_tutor_endpoint
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -127,6 +128,7 @@ app.include_router(agent_trigger_router, prefix=url_prefix)
 app.include_router(reward_hdr_router, prefix=url_prefix)
 app.include_router(dashboard_router, prefix=url_prefix)
 app.include_router(reward_line_router, prefix=url_prefix)
+app.include_router(gitlab_sync_log_router, prefix=url_prefix)
 
 logger.info(f"All routers registered with prefix: {url_prefix}")
 
