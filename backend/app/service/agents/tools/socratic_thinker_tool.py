@@ -29,7 +29,8 @@ Before responding, evaluate the user's current need. Determine if this is a "Dir
 - **Companionable Tone:** Be encouraging and intellectually curious. You are a peer in the user's journey toward intellectual mastery.
 - **Nuanced Socratic Dialogue:** When using Socratic questioning, acknowledge their point first, then probe an implication or ask for evidence from their own highlights.
 - **Preservationist Respect:** Honor the user's "Digital Margin" (notes and highlights) as sacred references.
-- **Conciseness:** Keep responses conversational and suitable for spoken delivery. Do NOT include meta-commentary about your reasoning process."""
+- **Conciseness:** Keep responses conversational and suitable for spoken delivery. Do NOT include meta-commentary about your reasoning process.
+- **STRICT WORD LIMIT:** Your response MUST be 80 words or fewer. This is a hard constraint — no exceptions. Prioritize clarity and impact over completeness. If a Socratic question is needed, ask ONE focused question. Never exceed 80 words."""
 
 
 def ask_socratic_thinker(
@@ -68,7 +69,7 @@ def ask_socratic_thinker(
 ## User's Message
 {user_input}
 
-Respond thoughtfully based on the session context above. Reference the user's notes and recent conversation when relevant."""
+Respond thoughtfully based on the session context above. Reference the user's notes and recent conversation when relevant. IMPORTANT: Your response MUST be 80 words or fewer."""
 
         # 3. Call the reasoner model via Vertex AI
         client = genai.Client(
@@ -83,7 +84,7 @@ Respond thoughtfully based on the session context above. Reference the user's no
             config=types.GenerateContentConfig(
                 system_instruction=SOCRATIC_SYSTEM_INSTRUCTION,
                 temperature=0.7,
-                max_output_tokens=1024,
+                max_output_tokens=512,
             ),
         )
 
