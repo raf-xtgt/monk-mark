@@ -221,11 +221,11 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
       const elapsedHours = elapsedSeconds / 3600;
 
       // Update focus session in database
-      // await FocusSessionService.updateFocusSession({
-      //   focusSessionGuid: focusSession.focusSessionGuid,
-      //   timeHrs: elapsedHours,
-      //   timeSeconds: elapsedSeconds,
-      // });
+      await FocusSessionService.updateFocusSession({
+        focusSessionGuid: focusSession.focusSessionGuid,
+        timeHrs: elapsedHours,
+        timeSeconds: elapsedSeconds,
+      });
 
       // Mark session as completed
       setFocusSessionCompleted(true);

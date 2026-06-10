@@ -503,18 +503,20 @@ const NoteContentCamera: React.FC<NoteContentCameraProps> = ({ onClose }) => {
                     <View>
                         {processingStatus ? (
                             <View style={styles.processingContainer}>
-                                <ActivityIndicator size="small" color="#4FC3F7" />
+                                <ActivityIndicator size="large" color="#4FC3F7" />
                                 <Text style={styles.processingText}>{processingStatus}</Text>
                             </View>
                         ) : (
                             <>
                                 <Text style={styles.instructionText}>Swipe on the image to highlight text</Text>
                                 <View style={styles.actionButtons}>
+                                    {/* Discard button */}
                                     <TouchableOpacity style={styles.discardButton} onPress={handleDiscard}>
                                         <Ionicons name="trash-outline" size={24} color="#fff" />
                                         <Text style={styles.buttonText}>Discard</Text>
                                     </TouchableOpacity>
 
+                                    {/* Save button */}
                                     <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
                                         <Ionicons name="checkmark-circle-outline" size={24} color="#fff" />
                                         <Text style={styles.buttonText}>Save</Text>
@@ -605,14 +607,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 10,
-        paddingVertical: 24,
-        paddingHorizontal: 20,
+        gap: 14,
+        paddingVertical: 40,
+        paddingHorizontal: 24,
     },
     processingText: {
         color: '#4FC3F7',
-        fontSize: 15,
-        fontWeight: '500',
+        fontSize: 20,
+        fontWeight: '600',
     },
     actionButtons: {
         flexDirection: 'row',
