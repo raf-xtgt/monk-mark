@@ -478,6 +478,7 @@ class AppMmRewardHdrService:
 
         notes_to_add = max(0, target_notes - existing_notes)
         notes_created = 0
+        created_content_guids = []
         for i in range(notes_to_add):
             seq = existing_notes + i + 1
             # Use simulation test notes if available, otherwise generate generic text
@@ -492,8 +493,27 @@ class AppMmRewardHdrService:
                 content_text=note_text,
                 sequence_no=seq,
             )
-            AppMmNotebookContentService.create_notebook_content(content_data)
+            created_content = AppMmNotebookContentService.create_notebook_content(content_data)
+            created_content_guids.append(created_content.guid)
             notes_created += 1
+
+        # --- Step 3b: Create notebook content file links for the created notes ---
+        from model.notebook.app_mm_notebook_content_file_link import AppMmNotebookContentFileLinkCreate
+        from service.notebook.app_mm_notebook_content_file_link_service import NotebookContentFileLinkService
+        from model.dto.reward_simulation_dto import SIMULATION_TEST_NOTE_LINKS
+
+        note_links_created = 0
+        for i, content_guid in enumerate(created_content_guids):
+            link_index = i % len(SIMULATION_TEST_NOTE_LINKS)
+            link_data = SIMULATION_TEST_NOTE_LINKS[link_index]
+            file_link = AppMmNotebookContentFileLinkCreate(
+                user_guid=user_guid,
+                notebook_hdr_guid=notebook_hdr_guid,
+                notebook_content_guid=content_guid,
+                image_url=link_data["image_url"],
+            )
+            NotebookContentFileLinkService.create(file_link)
+            note_links_created += 1
 
         # --- Step 4: Ensure llm_chat_hdr and transcripts exist (with focus_session_guid) ---
         from model.notebook.app_mm_notebook_llm_chat_hdr import AppMmNotebookLlmChatHdrCreate
@@ -559,6 +579,7 @@ class AppMmRewardHdrService:
             "notebook_created": notebook_created,
             "chat_hdr_created": chat_hdr_created,
             "notes_created": notes_created,
+            "note_links_created": note_links_created,
             "transcripts_created": transcripts_created,
             "sessions_created": sessions_created,
             "target_hours": round(target_hours, 2),

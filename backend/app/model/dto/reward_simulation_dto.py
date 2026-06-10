@@ -29,6 +29,25 @@ SIMULATION_TEST_NOTES: List[dict] = [
     },
 ]
 
+SIMULATION_TEST_NOTE_LINKS: List[dict] = [
+    {
+        "sequence_no": 1,
+        "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_7035efb9-4035-4554-96dc-881254d93d7a.jpeg",
+    },
+    {
+        "sequence_no": 2,
+        "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_90e7b212-5ed6-4ddf-b637-16a2813d857c.jpeg",
+    },
+    {
+        "sequence_no": 3,
+        "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_002c8bcf-81a1-4e7a-bb74-4ae2c257281c.jpeg",
+    },
+    {
+        "sequence_no": 4,
+        "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_3a71be04-f2e2-4719-bc02-e1bfb32c3b0b.jpeg",
+    },
+]
+
 
 SIMULATION_TEST_TRANSCRIPTS: List[dict] = [
     {
