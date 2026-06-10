@@ -10,6 +10,8 @@ import { NotebookHdrService } from '../../_services/_notebook-hdr-service';
 import { RewardHdrService } from '../../_services/_reward-hdr-service';
 import { RewardLineService } from '../../_services/_reward-line-service';
 import { AgentTriggerService } from '../../_services/_agent-trigger-service';
+import { AgentTriggerResponse } from '../../_model/dto/llm-dto/agent-trigger-response';
+import { GitLabSyncLogService } from '../../_services/_gitlab-sync-log-service';
 import { NotebookLlmChatTranscriptService } from '../../_services/_notebook-llm-chat-transcript-service';
 import { MilestoneEvaluation } from '../../_model/dto/reward-output-dto';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +40,8 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
   const [milestoneData, setMilestoneData] = useState<MilestoneEvaluation | null>(null);
   const [rewardDialogVisible, setRewardDialogVisible] = useState(false);
   const [rewardImageUrl, setRewardImageUrl] = useState<string | null>(null);
+  const [gitlabIssueUrl, setGitlabIssueUrl] = useState<string | null>(null);
+  const [gitlabMrUrl, setGitlabMrUrl] = useState<string | null>(null);
 
   const {
     focusSession,
@@ -116,6 +120,8 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
         timeHrs: currentHours + currentMinutes / 60,
         timeSeconds: totalSeconds,
       });
+      // TODO: display the userGuid and libraryHdrGuid 
+      console.log('Focus session created — userGuid:', user.guid, 'libraryHdrGuid:', focusSession.libraryHdrGuid);
 
       // Update focus session with the created guid
       setFocusSession({
@@ -381,18 +387,38 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
       // Step 4: Trigger art generation if milestone unlocked
       if (milestone && (milestone.agent_to_trigger === 'ART_GEN' || milestone.agent_to_trigger === 'ART_EVOLUTION')) {
         
-        // TODO: trigger gitlab agent
-        
-        
+        // Step 4a: Trigger GitLab agent to synthesize notes into issues/branches/MRs
+        setEvaluationStatus('Syncing knowledge to GitLab...');
+        let gitlabResponse: AgentTriggerResponse | null = null;
+        let visualMotif: string | undefined;
+        try {
+          gitlabResponse = await AgentTriggerService.triggerGitlabAgent({
+            userGuid: user.guid,
+            libraryHdrGuid: focusSession.libraryHdrGuid,
+            focusSessionGuid: focusSession.focusSessionGuid,
+          });
+          console.log('GitLab agent response:', gitlabResponse);
+          // Extract visual motif from gitlab output for art generation
+          visualMotif = gitlabResponse?.gitlab_output?.visual_motif_result ?? undefined;
+        } catch (gitlabError) {
+          console.warn('GitLab agent trigger failed (non-blocking):', gitlabError);
+        }
+
+        // Step 4b: Trigger art generation using the visual motif from GitLab
         setEvaluationStatus('Generating Legacy Art...');
-        const notebookGuid = focusSession?.libraryHdrGuid || '';
-        const eventType = milestone.agent_to_trigger === 'ART_EVOLUTION' ? 'generate_art_evolution' : 'generate_art';
-        const artResponse = await AgentTriggerService.triggerAgent({
-          userGuid: user.guid,
-          libraryHdrGuid: focusSession.libraryHdrGuid,
-          notebookHdrGuid: notebookGuid,
-          eventType: eventType,
-        });
+        let artResponse: AgentTriggerResponse;
+        if (milestone.agent_to_trigger === 'ART_EVOLUTION') {
+          artResponse = await AgentTriggerService.triggerArtEvolutionAgent({
+            userGuid: user.guid,
+            libraryHdrGuid: focusSession.libraryHdrGuid,
+            visualMotif: visualMotif,
+          });
+        } else {
+          artResponse = await AgentTriggerService.triggerArtAgent({
+            userGuid: user.guid,
+            visualMotif: visualMotif,
+          });
+        }
         console.log('Art generation response:', artResponse);
         setEvaluationStatus('Legacy Art generated!');
 
@@ -408,10 +434,33 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
           console.log('Reward line created for tier:', milestone.current_tier);
         }
 
-        // Show reward dialog with the generated art
+        // Step 6: Create GitLab sync log record
+        if (gitlabResponse?.gitlab_output) {
+          try {
+            await GitLabSyncLogService.create({
+              user_guid: user.guid,
+              focus_session_guid: focusSession.focusSessionGuid,
+              library_hdr_guid: focusSession.libraryHdrGuid,
+              branch_name: gitlabResponse.gitlab_output.branch_result ?? undefined,
+              issue_url: gitlabResponse.gitlab_output.issue_url ?? undefined,
+              merge_request_url: gitlabResponse.gitlab_output.mr_result ?? undefined,
+              sync_status: 'completed',
+            });
+            console.log('GitLab sync log created');
+          } catch (syncLogError) {
+            console.warn('Failed to create GitLab sync log:', syncLogError);
+          }
+        }
+
+        // Show reward dialog with the generated art and GitLab links
         if (artResponse.storage_url) {
           setRewardImageUrl(artResponse.storage_url);
           setRewardDialogVisible(true);
+        }
+        // Store gitlab links for the reward dialog
+        if (gitlabResponse?.gitlab_output) {
+          setGitlabIssueUrl(gitlabResponse.gitlab_output.issue_url ?? null);
+          setGitlabMrUrl(gitlabResponse.gitlab_output.mr_result ?? null);
         }
       }
 
@@ -470,7 +519,13 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
       <MonkModeRewardDialogue
         visible={rewardDialogVisible}
         imageUrl={rewardImageUrl}
-        onClose={() => setRewardDialogVisible(false)}
+        issueUrl={gitlabIssueUrl}
+        mrUrl={gitlabMrUrl}
+        onClose={() => {
+          setRewardDialogVisible(false);
+          setGitlabIssueUrl(null);
+          setGitlabMrUrl(null);
+        }}
         onGalleryPress={() => {}}
       />
 

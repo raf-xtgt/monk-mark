@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Modal, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface MonkModeRewardDialogueProps {
@@ -11,6 +11,10 @@ interface MonkModeRewardDialogueProps {
   tierLevel?: number;
   /** Optional array of tier levels corresponding to each image */
   tierLevels?: (number | null)[];
+  /** Optional GitLab issue URL */
+  issueUrl?: string | null;
+  /** Optional GitLab merge request URL */
+  mrUrl?: string | null;
   onClose: () => void;
   onGalleryPress: () => void;
 }
@@ -21,6 +25,8 @@ const MonkModeRewardDialogue: React.FC<MonkModeRewardDialogueProps> = ({
   images,
   tierLevel,
   tierLevels,
+  issueUrl,
+  mrUrl,
   onClose,
   onGalleryPress,
 }) => {
@@ -138,6 +144,30 @@ const MonkModeRewardDialogue: React.FC<MonkModeRewardDialogueProps> = ({
             ) : null;
           })()}
 
+          {/* GitLab links */}
+          {(issueUrl || mrUrl) && (
+            <View style={styles.gitlabLinksContainer}>
+              {issueUrl && (
+                <TouchableOpacity
+                  style={styles.gitlabLink}
+                  onPress={() => Linking.openURL(issueUrl)}
+                >
+                  <Ionicons name="git-branch-outline" size={16} color="#6366F1" />
+                  <Text style={styles.gitlabLinkText}>View Issue</Text>
+                </TouchableOpacity>
+              )}
+              {mrUrl && (
+                <TouchableOpacity
+                  style={styles.gitlabLink}
+                  onPress={() => Linking.openURL(mrUrl)}
+                >
+                  <Ionicons name="git-merge-outline" size={16} color="#6366F1" />
+                  <Text style={styles.gitlabLinkText}>View Merge Request</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           {/* Gallery button */}
           <TouchableOpacity style={styles.galleryButton} onPress={onGalleryPress}>
             <Text style={styles.galleryButtonText}>Close</Text>
@@ -229,6 +259,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  gitlabLinksContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  gitlabLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 8,
+  },
+  gitlabLinkText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6366F1',
   },
 });
 
