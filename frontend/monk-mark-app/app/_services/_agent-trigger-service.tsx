@@ -12,6 +12,17 @@ export interface AgentTriggerRequest {
     message?: string;
 }
 
+export interface ArtGenerationRequest {
+    userGuid: string;
+    visualMotif?: string;
+}
+
+export interface ArtEvolutionRequest {
+    userGuid: string;
+    libraryHdrGuid: string;
+    visualMotif?: string;
+}
+
 export type { AgentTriggerResponse, GitlabAgentTriggerRequest };
 
 export const AgentTriggerService = {
@@ -103,6 +114,67 @@ export const AgentTriggerService = {
             }
         } catch (error) {
             console.error('Error triggering gitlab agent:', error);
+            throw error;
+        }
+    },
+
+    async triggerArtAgent(payload: ArtGenerationRequest): Promise<AgentTriggerResponse> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/agent/trigger-art`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_guid: payload.userGuid,
+                    visual_motif: payload.visualMotif,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.status === 'OK_RESPONSE' && result.data) {
+                return result.data as AgentTriggerResponse;
+            } else {
+                throw new Error(result.data?.message || 'Failed to trigger art agent');
+            }
+        } catch (error) {
+            console.error('Error triggering art agent:', error);
+            throw error;
+        }
+    },
+
+    async triggerArtEvolutionAgent(payload: ArtEvolutionRequest): Promise<AgentTriggerResponse> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/agent/trigger-art-evolution`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_guid: payload.userGuid,
+                    library_hdr_guid: payload.libraryHdrGuid,
+                    visual_motif: payload.visualMotif,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.status === 'OK_RESPONSE' && result.data) {
+                return result.data as AgentTriggerResponse;
+            } else {
+                throw new Error(result.data?.message || 'Failed to trigger art evolution agent');
+            }
+        } catch (error) {
+            console.error('Error triggering art evolution agent:', error);
             throw error;
         }
     },
