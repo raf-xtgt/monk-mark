@@ -182,7 +182,7 @@ async def simulate_rewards(payload: RewardSimulationDto):
     """
     try:
         # Step 1-4: Generate test data and evaluate
-        sim_result = AppMmRewardHdrService.simulate_reward_flow(
+        sim_result = await AppMmRewardHdrService.simulate_reward_flow(
             user_guid=payload.user_guid,
             library_hdr_guid=payload.library_guid,
             tier_level=payload.tier_level,

@@ -378,7 +378,7 @@ class AppMmRewardHdrService:
         }
 
     @staticmethod
-    def simulate_reward_flow(
+    async def simulate_reward_flow(
         user_guid: UUID,
         library_hdr_guid: UUID,
         tier_level: int,
