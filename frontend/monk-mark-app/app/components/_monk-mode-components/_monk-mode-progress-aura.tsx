@@ -13,47 +13,60 @@ const STROKE_WIDTH = 6;
 const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-// Segment allocation: 70% for focus hours, 30% for notes
-const FOCUS_SEGMENT_RATIO = 0.7;
-const NOTES_SEGMENT_RATIO = 0.3;
-const FOCUS_ARC_LENGTH = CIRCUMFERENCE * FOCUS_SEGMENT_RATIO;
-const NOTES_ARC_LENGTH = CIRCUMFERENCE * NOTES_SEGMENT_RATIO;
-
 // Colors
 const FOCUS_COLOR = '#4ecdc4';       // Teal
 const NOTES_COLOR = '#f4c542';       // Gold
-const TRACK_FOCUS = 'rgba(78, 205, 196, 0.15)';
-const TRACK_NOTES = 'rgba(244, 197, 66, 0.15)';
+const TRACK_COLOR = 'rgba(255, 255, 255, 0.1)';
 
-// Rotation offsets (starting from top, -90deg)
-// Focus arc starts at -90 (top) and spans 70% clockwise (252 degrees)
-// Notes arc starts where focus ends: -90 + 252 = 162 degrees
-const FOCUS_START_ROTATION = -90;
-const NOTES_START_ROTATION = -90 + (360 * FOCUS_SEGMENT_RATIO); // 162
+// Both arcs start from the top (-90 degrees) and fill clockwise.
+// Focus uses the full circumference — its dasharray limits the visible portion.
+// Notes uses the full circumference similarly.
+const START_ROTATION = -90;
 
 const ProgressAura: React.FC<ProgressAuraProps> = ({ milestone, children }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Track peak progress within a session to prevent visual regression
+  const peakFocusRef = useRef(0);
+  const peakNotesRef = useRef(0);
+
   const focusProgress = useMemo(() => {
     if (!milestone) return 0;
-    return Math.max(0, Math.min(100, milestone.hour_completion_percentage));
-  }, [milestone?.hour_completion_percentage]);
+    const raw = Math.max(0, Math.min(100, milestone.hour_completion_percentage));
+    if (raw >= peakFocusRef.current) {
+      peakFocusRef.current = raw;
+    }
+    return peakFocusRef.current;
+  }, [milestone?.hour_completion_percentage, milestone?.current_tier]);
 
   const noteProgress = useMemo(() => {
     if (!milestone) return 0;
-    return Math.max(0, Math.min(100, milestone.note_completion_percentage));
-  }, [milestone?.note_completion_percentage]);
-
-  // Stroke dash offsets for each segment
-  const focusDashoffset = useMemo(() => {
-    return FOCUS_ARC_LENGTH - (focusProgress / 100) * FOCUS_ARC_LENGTH;
-  }, [focusProgress]);
-
-  const notesDashoffset = useMemo(() => {
-    return NOTES_ARC_LENGTH - (noteProgress / 100) * NOTES_ARC_LENGTH;
-  }, [noteProgress]);
+    const raw = Math.max(0, Math.min(100, milestone.note_completion_percentage));
+    if (raw >= peakNotesRef.current) {
+      peakNotesRef.current = raw;
+    }
+    return peakNotesRef.current;
+  }, [milestone?.note_completion_percentage, milestone?.current_tier]);
 
   const bothFulfilled = (milestone?.is_hour_fulfilled && milestone?.is_note_fulfilled) ?? false;
+
+  // Calculate the filled length for each arc.
+  // Focus arc occupies 70% of the circumference, Notes arc occupies 30%.
+  const focusArcLength = CIRCUMFERENCE * 0.7;
+  const notesArcLength = CIRCUMFERENCE * 0.3;
+
+  // The filled portion grows from 0 to the full arc length.
+  // strokeDashoffset = arcLength - filledLength  (when positive, hides the tail)
+  const focusFilled = bothFulfilled ? focusArcLength : (focusProgress / 100) * focusArcLength;
+  const notesFilled = bothFulfilled ? notesArcLength : (noteProgress / 100) * notesArcLength;
+
+  // strokeDasharray: [arcLength, gap] — where gap hides the rest of the ring
+  // strokeDashoffset: shifts the dash pattern backwards to reveal from the start
+  const focusDashoffset = focusArcLength - focusFilled;
+  const notesDashoffset = notesArcLength - notesFilled;
+
+  // Notes arc starts where focus arc ends: -90 + 252 = 162 degrees
+  const notesRotation = START_ROTATION + 360 * 0.7;
 
   // Pulse animation when both thresholds are fulfilled
   useEffect(() => {
@@ -81,45 +94,22 @@ const ProgressAura: React.FC<ProgressAuraProps> = ({ milestone, children }) => {
     }
   }, [bothFulfilled]);
 
-  const tierLabel = useMemo(() => {
-    if (!milestone) return '';
-    const tierNames = ['I', 'II', 'III', 'IV', 'V'];
-    const nextTierIndex = Math.min(milestone.next_tier - 1, tierNames.length - 1);
-    return `Evolution ${tierNames[nextTierIndex]}`;
-  }, [milestone?.next_tier]);
-
   return (
     <View style={styles.container}>
       {/* Progress Ring */}
       <Animated.View style={[styles.ringContainer, { transform: [{ scale: pulseAnim }] }]}>
         <Svg width={RING_SIZE} height={RING_SIZE} style={styles.svg}>
-          {/* Focus background track (70%) */}
+          {/* Full background track */}
           <Circle
             cx={RING_SIZE / 2}
             cy={RING_SIZE / 2}
             r={RADIUS}
-            stroke={TRACK_FOCUS}
+            stroke={TRACK_COLOR}
             strokeWidth={STROKE_WIDTH}
             fill="transparent"
-            strokeDasharray={`${FOCUS_ARC_LENGTH} ${CIRCUMFERENCE - FOCUS_ARC_LENGTH}`}
-            strokeLinecap="round"
-            rotation={FOCUS_START_ROTATION}
-            origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
           />
-          {/* Notes background track (30%) */}
-          <Circle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
-            r={RADIUS}
-            stroke={TRACK_NOTES}
-            strokeWidth={STROKE_WIDTH}
-            fill="transparent"
-            strokeDasharray={`${NOTES_ARC_LENGTH} ${CIRCUMFERENCE - NOTES_ARC_LENGTH}`}
-            strokeLinecap="round"
-            rotation={NOTES_START_ROTATION}
-            origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
-          />
-          {/* Focus active arc */}
+
+          {/* Focus active arc — starts at top, spans 70% of ring */}
           <Circle
             cx={RING_SIZE / 2}
             cy={RING_SIZE / 2}
@@ -127,13 +117,13 @@ const ProgressAura: React.FC<ProgressAuraProps> = ({ milestone, children }) => {
             stroke={FOCUS_COLOR}
             strokeWidth={STROKE_WIDTH}
             fill="transparent"
-            strokeDasharray={`${FOCUS_ARC_LENGTH} ${CIRCUMFERENCE - FOCUS_ARC_LENGTH}`}
-            strokeDashoffset={bothFulfilled ? 0 : focusDashoffset}
+            strokeDasharray={`${focusFilled} ${CIRCUMFERENCE - focusFilled}`}
             strokeLinecap="round"
-            rotation={FOCUS_START_ROTATION}
+            rotation={START_ROTATION}
             origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
           />
-          {/* Notes active arc */}
+
+          {/* Notes active arc — starts where focus ends, spans 30% of ring */}
           <Circle
             cx={RING_SIZE / 2}
             cy={RING_SIZE / 2}
@@ -141,10 +131,9 @@ const ProgressAura: React.FC<ProgressAuraProps> = ({ milestone, children }) => {
             stroke={NOTES_COLOR}
             strokeWidth={STROKE_WIDTH}
             fill="transparent"
-            strokeDasharray={`${NOTES_ARC_LENGTH} ${CIRCUMFERENCE - NOTES_ARC_LENGTH}`}
-            strokeDashoffset={bothFulfilled ? 0 : notesDashoffset}
+            strokeDasharray={`${notesFilled} ${CIRCUMFERENCE - notesFilled}`}
             strokeLinecap="round"
-            rotation={NOTES_START_ROTATION}
+            rotation={notesRotation}
             origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
           />
         </Svg>
@@ -154,11 +143,6 @@ const ProgressAura: React.FC<ProgressAuraProps> = ({ milestone, children }) => {
           {children}
         </View>
       </Animated.View>
-
-      {/* Tier label */}
-      {/* {milestone && (
-        <Text style={styles.tierLabel}>{tierLabel}</Text>
-      )} */}
 
       {/* Segment legend */}
       {milestone && (
@@ -193,14 +177,6 @@ const styles = StyleSheet.create({
   childContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tierLabel: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4ecdc4',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   legendContainer: {
     flexDirection: 'row',
