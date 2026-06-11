@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { DashboardLegacyArtByHdr, RewardLine } from '../../_model/dto/_dashboard-dto';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { DashboardLegacyArtByHdr, RewardLineWithSyncLog } from '../../_model/dto/_dashboard-dto';
+import { Ionicons } from '@expo/vector-icons';
 import MonkModeRewardDialogue from '../_monk-mode-components/_monk-mode-reward-dialog';
 
 interface DashboardLegacyArtCardProps {
@@ -18,13 +19,23 @@ const DashboardLegacyArtCard: React.FC<DashboardLegacyArtCardProps> = ({ artHdr 
 
   // Collect all image URLs for the dialog
   const imageUrls = lines
-    .map((line: RewardLine) => line.image_url)
+    .map((entry: RewardLineWithSyncLog) => entry.reward_line.image_url)
     .filter((url): url is string => !!url);
 
   // Collect tier levels corresponding to each image
   const tierLevels = lines
-    .filter((line: RewardLine) => !!line.image_url)
-    .map((line: RewardLine) => line.tier_level);
+    .filter((entry: RewardLineWithSyncLog) => !!entry.reward_line.image_url)
+    .map((entry: RewardLineWithSyncLog) => entry.reward_line.tier_level);
+
+  // Get the latest sync log (from the most recent reward line that has one)
+  const latestSyncLog = [...lines]
+    .reverse()
+    .find((entry: RewardLineWithSyncLog) => entry.gitlab_sync_log != null)
+    ?.gitlab_sync_log ?? null;
+
+  const issueUrl = latestSyncLog?.issue_url ?? null;
+  const mrUrl = latestSyncLog?.merge_request_url ?? null;
+  const fileUrl = latestSyncLog?.file_url ?? null;
 
   const tierLevel = artHdr.reward_hdr_tier_level;
 
@@ -41,10 +52,10 @@ const DashboardLegacyArtCard: React.FC<DashboardLegacyArtCardProps> = ({ artHdr 
       <TouchableOpacity style={styles.card} onPress={handlePress} activeOpacity={0.8}>
         {/* Stacked images */}
         <View style={styles.stackContainer}>
-          {stackedLines.map((line: RewardLine, index: number) => (
+          {stackedLines.map((entry: RewardLineWithSyncLog, index: number) => (
             <Image
-              key={line.guid}
-              source={{ uri: line.image_url || undefined }}
+              key={entry.reward_line.guid}
+              source={{ uri: entry.reward_line.image_url || undefined }}
               style={[
                 styles.stackedImage,
                 {
@@ -61,18 +72,23 @@ const DashboardLegacyArtCard: React.FC<DashboardLegacyArtCardProps> = ({ artHdr 
           )}
         </View>
 
-        {/* Tier label */}
-        {/* <Text style={styles.tierLabel} numberOfLines={1}>
-          {tierLevel != null ? `Tier ${tierLevel}` : 'Legacy Art'}
-        </Text> */}
+        {/* Sync indicator dot */}
+        {latestSyncLog && (
+          <View style={styles.syncIndicator}>
+            <Ionicons name="git-merge-outline" size={10} color="#6366F1" />
+          </View>
+        )}
       </TouchableOpacity>
 
-      {/* Reward dialog with paginated images */}
+      {/* Reward dialog with paginated images and GitLab workflow steps */}
       <MonkModeRewardDialogue
         visible={dialogVisible}
         imageUrl={imageUrls.length > 0 ? imageUrls[0] : null}
         images={imageUrls}
         tierLevels={tierLevels}
+        issueUrl={issueUrl}
+        mrUrl={mrUrl}
+        fileUrl={fileUrl}
         onClose={handleCloseDialog}
         onGalleryPress={handleCloseDialog}
       />
@@ -95,6 +111,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3,
+    position: 'relative',
   },
   stackContainer: {
     width: 98,
@@ -113,12 +130,18 @@ const styles = StyleSheet.create({
   placeholderImage: {
     backgroundColor: '#E5E7EB',
   },
-  tierLabel: {
-    marginTop: 10,
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#6B7280',
-    textAlign: 'center',
+  syncIndicator: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
   },
 });
 

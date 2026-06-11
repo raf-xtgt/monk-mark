@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 // - Physical device: replace with your machine's IP address (e.g., 192.168.1.x)
 const getApiBaseUrl = () => {
   if (Platform.OS === 'android') {
-    return 'https://83cb-103-120-202-172.ngrok-free.app/api/mm';
+    return 'https://8804-103-120-202-172.ngrok-free.app/api/mm';
   }
   // iOS simulator or web
   return 'http://localhost:8000/api/mm';
@@ -14,7 +14,7 @@ const getApiBaseUrl = () => {
 
 const getWebSocketUrl = () => {
   if (Platform.OS === 'android') {
-    return 'wss://83cb-103-120-202-172.ngrok-free.app/ws/voice-tutor';
+    return 'wss://8804-103-120-202-172.ngrok-free.app/ws/voice-tutor';
   }
   // iOS simulator or web
   return 'ws://localhost:8000/ws/voice-tutor';

@@ -42,6 +42,7 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
   const [rewardImageUrl, setRewardImageUrl] = useState<string | null>(null);
   const [gitlabIssueUrl, setGitlabIssueUrl] = useState<string | null>(null);
   const [gitlabMrUrl, setGitlabMrUrl] = useState<string | null>(null);
+  const [gitlabFileUrl, setGitlabFileUrl] = useState<string | null>(null);
 
   const {
     focusSession,
@@ -121,7 +122,7 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
         timeSeconds: totalSeconds,
       });
       // TODO: display the userGuid and libraryHdrGuid 
-      console.log('Focus session created — userGuid:', user.guid, 'libraryHdrGuid:', focusSession.libraryHdrGuid);
+      console.log('Focus session created — userGuid:', user.guid, 'libraryHdrGuid:', focusSession.libraryHdrGuid, 'focusSessionGuid:', createdSession.focusSessionGuid);
 
       // Update focus session with the created guid
       setFocusSession({
@@ -221,11 +222,11 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
       const elapsedHours = elapsedSeconds / 3600;
 
       // Update focus session in database
-      await FocusSessionService.updateFocusSession({
-        focusSessionGuid: focusSession.focusSessionGuid,
-        timeHrs: elapsedHours,
-        timeSeconds: elapsedSeconds,
-      });
+      // await FocusSessionService.updateFocusSession({
+      //   focusSessionGuid: focusSession.focusSessionGuid,
+      //   timeHrs: elapsedHours,
+      //   timeSeconds: elapsedSeconds,
+      // });
 
       // Mark session as completed
       setFocusSessionCompleted(true);
@@ -423,14 +424,16 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
         setEvaluationStatus('Legacy Art generated!');
 
         // Step 5: Create reward line record with the generated art URL
+        let rewardLineGuid: string | undefined;
         if (artResponse.storage_url && evaluated.reward_list.length > 0) {
           const rewardHdrGuid = evaluated.reward_list[evaluated.reward_list.length - 1].guid;
-          await RewardLineService.createRewardLine({
+          const rewardLine = await RewardLineService.createRewardLine({
             userGuid: user.guid,
             rewardHdrGuid: rewardHdrGuid,
             imageUrl: artResponse.storage_url,
             tierLevel: milestone.current_tier,
           });
+          rewardLineGuid = rewardLine?.guid;
           console.log('Reward line created for tier:', milestone.current_tier);
         }
 
@@ -441,9 +444,11 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
               user_guid: user.guid,
               focus_session_guid: focusSession.focusSessionGuid,
               library_hdr_guid: focusSession.libraryHdrGuid,
+              reward_line_guid: rewardLineGuid,
               branch_name: gitlabResponse.gitlab_output.branch_result ?? undefined,
               issue_url: gitlabResponse.gitlab_output.issue_url ?? undefined,
               merge_request_url: gitlabResponse.gitlab_output.mr_result ?? undefined,
+              file_url: gitlabResponse.gitlab_output.file_url ?? undefined,
               sync_status: 'completed',
             });
             console.log('GitLab sync log created');
@@ -461,6 +466,7 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
         if (gitlabResponse?.gitlab_output) {
           setGitlabIssueUrl(gitlabResponse.gitlab_output.issue_url ?? null);
           setGitlabMrUrl(gitlabResponse.gitlab_output.mr_result ?? null);
+          setGitlabFileUrl(gitlabResponse.gitlab_output.file_url ?? null);
         }
       }
 
@@ -521,10 +527,12 @@ const MonkModeView: React.FC<MonkModeViewProps> = ({ selectedBook }) => {
         imageUrl={rewardImageUrl}
         issueUrl={gitlabIssueUrl}
         mrUrl={gitlabMrUrl}
+        fileUrl={gitlabFileUrl}
         onClose={() => {
           setRewardDialogVisible(false);
           setGitlabIssueUrl(null);
           setGitlabMrUrl(null);
+          setGitlabFileUrl(null);
         }}
         onGalleryPress={() => {}}
       />

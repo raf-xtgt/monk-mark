@@ -34,10 +34,32 @@ export interface RewardLine {
   updated_date: string;
 }
 
+export interface GitlabSyncLog {
+  guid: string;
+  user_guid: string | null;
+  focus_session_guid: string | null;
+  notebook_hdr_guid: string | null;
+  library_hdr_guid: string | null;
+  llm_chat_hdr_guid: string | null;
+  reward_line_guid: string | null;
+  branch_name: string | null;
+  issue_url: string | null;
+  merge_request_url: string | null;
+  file_url: string | null;
+  sync_status: string | null;
+  created_date: string;
+  updated_date: string;
+}
+
+export interface RewardLineWithSyncLog {
+  reward_line: RewardLine;
+  gitlab_sync_log: GitlabSyncLog | null;
+}
+
 export interface DashboardLegacyArtByHdr {
   reward_hdr_guid: string;
   reward_hdr_tier_level: number | null;
   reward_hdr_library_guid: string;
   reward_hdr_notebook_guid: string;
-  reward_lines: RewardLine[];
+  reward_lines: RewardLineWithSyncLog[];
 }

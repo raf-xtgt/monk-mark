@@ -3,6 +3,7 @@ export interface GitlabAgentOutput {
     issue_url: string | null;
     branch_result: string | null;
     mr_result: string | null;
+    file_url: string | null;
     visual_motif_result: string | null;
 }
 

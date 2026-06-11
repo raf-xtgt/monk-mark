@@ -15,6 +15,8 @@ interface MonkModeRewardDialogueProps {
   issueUrl?: string | null;
   /** Optional GitLab merge request URL */
   mrUrl?: string | null;
+  /** Optional GitLab file URL (reading notes) */
+  fileUrl?: string | null;
   onClose: () => void;
   onGalleryPress: () => void;
 }
@@ -27,6 +29,7 @@ const MonkModeRewardDialogue: React.FC<MonkModeRewardDialogueProps> = ({
   tierLevels,
   issueUrl,
   mrUrl,
+  fileUrl,
   onClose,
   onGalleryPress,
 }) => {
@@ -144,25 +147,56 @@ const MonkModeRewardDialogue: React.FC<MonkModeRewardDialogueProps> = ({
             ) : null;
           })()}
 
-          {/* GitLab links */}
-          {(issueUrl || mrUrl) && (
-            <View style={styles.gitlabLinksContainer}>
-              {issueUrl && (
-                <TouchableOpacity
-                  style={styles.gitlabLink}
-                  onPress={() => Linking.openURL(issueUrl)}
-                >
-                  <Ionicons name="git-branch-outline" size={16} color="#6366F1" />
-                  <Text style={styles.gitlabLinkText}>View Issue</Text>
-                </TouchableOpacity>
-              )}
+          {/* GitLab workflow steps */}
+          {(mrUrl || fileUrl || issueUrl) && (
+            <View style={styles.gitlabStepsContainer}>
+              <Text style={styles.gitlabStepsTitle}>Your Knowledge Sync</Text>
+
               {mrUrl && (
                 <TouchableOpacity
-                  style={styles.gitlabLink}
+                  style={styles.gitlabStepRow}
                   onPress={() => Linking.openURL(mrUrl)}
                 >
-                  <Ionicons name="git-merge-outline" size={16} color="#6366F1" />
-                  <Text style={styles.gitlabLinkText}>View Merge Request</Text>
+                  <View style={styles.stepBadge}>
+                    <Text style={styles.stepBadgeText}>1</Text>
+                  </View>
+                  <View style={styles.stepContent}>
+                    <Text style={styles.stepLabel}>Merge the PR</Text>
+                    <Ionicons name="git-merge-outline" size={14} color="#6366F1" />
+                  </View>
+                  <Ionicons name="open-outline" size={14} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+
+              {fileUrl && (
+                <TouchableOpacity
+                  style={styles.gitlabStepRow}
+                  onPress={() => Linking.openURL(fileUrl)}
+                >
+                  <View style={styles.stepBadge}>
+                    <Text style={styles.stepBadgeText}>2</Text>
+                  </View>
+                  <View style={styles.stepContent}>
+                    <Text style={styles.stepLabel}>Access the note</Text>
+                    <Ionicons name="document-text-outline" size={14} color="#6366F1" />
+                  </View>
+                  <Ionicons name="open-outline" size={14} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+
+              {issueUrl && (
+                <TouchableOpacity
+                  style={styles.gitlabStepRow}
+                  onPress={() => Linking.openURL(issueUrl)}
+                >
+                  <View style={styles.stepBadge}>
+                    <Text style={styles.stepBadgeText}>i</Text>
+                  </View>
+                  <View style={styles.stepContent}>
+                    <Text style={styles.stepLabel}>Issue for reference</Text>
+                    <Ionicons name="git-branch-outline" size={14} color="#6366F1" />
+                  </View>
+                  <Ionicons name="open-outline" size={14} color="#9CA3AF" />
                 </TouchableOpacity>
               )}
             </View>
@@ -260,24 +294,56 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  gitlabLinksContainer: {
-    flexDirection: 'row',
-    gap: 12,
+  gitlabStepsContainer: {
+    width: '100%',
     marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
   },
-  gitlabLink: {
+  gitlabStepsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  gitlabStepRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
+    gap: 10,
     paddingVertical: 8,
-    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  gitlabLinkText: {
-    fontSize: 13,
+  stepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  stepContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepLabel: {
+    fontSize: 14,
     fontWeight: '500',
-    color: '#6366F1',
+    color: '#374151',
   },
 });
 
