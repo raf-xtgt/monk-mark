@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 AI_MODEL = os.getenv("SYNTHESIS_MODEL", "gemini-2.5-flash")
 GITLAB_TOKEN = os.environ.get("GITLAB_PERSONAL_ACCESS_TOKEN", "")
 TARGET_PROJECT = os.environ.get("GITLAB_PROJECT_ID", "")
-DEFAULT_BRANCH = "test-branch"
+DEFAULT_BRANCH = "main" #"test-branch"
 
 # Duplicate OS environment for the MCP Node subprocess
 mcp_env = os.environ.copy()
