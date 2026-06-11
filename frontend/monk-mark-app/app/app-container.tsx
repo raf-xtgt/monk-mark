@@ -45,6 +45,7 @@ const AppContainer: React.FC = () => {
         <BottomNavigation
           currentRoute={currentRoute}
           onNavigate={setCurrentRoute}
+          backgroundColor={currentRoute === 4 ? '#4a4a5e' : undefined}
         />
       )}
     </SafeAreaView>

@@ -5,14 +5,15 @@ import { routes } from '../../router';
 interface BottomNavigationProps {
   currentRoute: number;
   onNavigate: (routeId: number) => void;
+  backgroundColor?: string;
 }
 
-const BottomNavigation: React.FC<BottomNavigationProps> = ({ currentRoute, onNavigate }) => {
+const BottomNavigation: React.FC<BottomNavigationProps> = ({ currentRoute, onNavigate, backgroundColor }) => {
   const regularRoutes = routes.filter(r => r.id !== 4 && r.id !== 6); // Exclude MonkMode and NoteTaker
   const monkModeRoute = routes.find(r => r.id === 4); // MonkMode route
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, backgroundColor ? { backgroundColor } : undefined]}>
       <View style={styles.navBar}>
         {/* First two tabs */}
         {regularRoutes.slice(0, 2).map((route) => (
