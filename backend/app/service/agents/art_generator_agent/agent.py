@@ -210,7 +210,7 @@ refinement_loop = LoopAgent(
     name="ArtRefinementLoop",
     description="Iteratively generates and refines artwork until quality threshold is met.",
     sub_agents=[imaging_agent, critic_agent, refiner_agent],
-    max_iterations=3,
+    max_iterations=1,
 )
 
 
@@ -280,7 +280,7 @@ evolution_refinement_loop = LoopAgent(
     name="ArtEvolutionRefinementLoop",
     description="Iteratively generates and refines evolved artwork until quality threshold is met.",
     sub_agents=[evolution_imaging_agent, evolution_critic_agent, evolution_refiner_agent],
-    max_iterations=2,
+    max_iterations=1,
 )
 
 

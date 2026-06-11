@@ -21,12 +21,14 @@ class GitlabAgentOutput:
         issue_url: Optional[str] = None,
         branch_result: Optional[str] = None,
         mr_result: Optional[str] = None,
+        file_url: Optional[str] = None,
         visual_motif_result: Optional[str] = None,
     ):
         self.issue_result = issue_result
         self.issue_url = issue_url
         self.branch_result = branch_result
         self.mr_result = mr_result
+        self.file_url = file_url
         self.visual_motif_result = visual_motif_result
 
 
@@ -49,6 +51,47 @@ class AgentTriggerResult:
 
 
 class AgentTriggerService:
+
+    @staticmethod
+    def gitlab_agent_helper(mr_result: Optional[str]) -> Optional[str]:
+        """Extract the MR ID from mr_result URL and construct the file URL.
+
+        The mr_result is expected to be a GitLab merge request URL like:
+            https://gitlab.com/paperplane-dev/PaperPlane-dev/-/merge_requests/12
+
+        The file URL is constructed as:
+            https://gitlab.com/{namespace}/{project}/-/blob/main/docs/reading-notes-{id}.md
+
+        Returns:
+            The constructed file URL, or None if extraction fails.
+        """
+        if not mr_result:
+            return None
+
+        # Extract the MR ID from the URL (last path segment)
+        try:
+            # Handle case where mr_result might have extra whitespace or newlines
+            mr_url = mr_result.strip()
+            # Split by '/' and grab the last segment as the ID
+            segments = mr_url.rstrip("/").split("/")
+            mr_id = segments[-1]
+
+            # Validate it's numeric
+            if not mr_id.isdigit():
+                logger.warning(f"Could not extract numeric MR ID from: {mr_result}")
+                return None
+
+            namespace = os.environ.get("GITLAB_PROJECT_NAMESPACE", "")
+            project = os.environ.get("GITLAB_PROJECT", "")
+
+            if not namespace or not project:
+                logger.warning("GITLAB_PROJECT_NAMESPACE or GITLAB_PROJECT not set in .env")
+                return None
+
+            return f"https://gitlab.com/{namespace}/{project}/-/blob/main/docs/reading-notes-{mr_id}.md"
+        except Exception as e:
+            logger.error(f"Error constructing file URL from mr_result '{mr_result}': {e}")
+            return None
 
     @staticmethod
     def _parse_issue_result(issue_result_raw: Optional[str]) -> tuple[Optional[str], Optional[str]]:
@@ -210,11 +253,14 @@ class AgentTriggerService:
         if session and event_type in ("gitlab_doc_v2",):
             issue_result_raw = session.state.get("issue_result")
             issue_title_line, issue_url = AgentTriggerService._parse_issue_result(issue_result_raw)
+            mr_result_val = session.state.get("mr_result")
+            file_url = AgentTriggerService.gitlab_agent_helper(mr_result_val)
             gitlab_output = GitlabAgentOutput(
                 issue_result=issue_title_line,
                 issue_url=issue_url,
                 branch_result=session.state.get("branch_result"),
-                mr_result=session.state.get("mr_result"),
+                mr_result=mr_result_val,
+                file_url=file_url,
                 visual_motif_result=session.state.get("visual_motif_result"),
             )
 
@@ -348,11 +394,14 @@ class AgentTriggerService:
         if session:
             issue_result_raw = session.state.get("issue_result")
             issue_title_line, issue_url = AgentTriggerService._parse_issue_result(issue_result_raw)
+            mr_result_val = session.state.get("mr_result")
+            file_url = AgentTriggerService.gitlab_agent_helper(mr_result_val)
             gitlab_output = GitlabAgentOutput(
                 issue_result=issue_title_line,
                 issue_url=issue_url,
                 branch_result=session.state.get("branch_result"),
-                mr_result=session.state.get("mr_result"),
+                mr_result=mr_result_val,
+                file_url=file_url,
                 visual_motif_result=session.state.get("visual_motif_result"),
             )
 
