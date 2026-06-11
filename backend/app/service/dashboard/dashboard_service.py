@@ -1,8 +1,15 @@
 from uuid import UUID
 from typing import List
 from util.supabase_config import supabase
-from model.dto.dashboard_dto import DashboardStatsResponseDto, DashboardNotebookResponseDto, DashboardLegacyArtResponseDto, DashboardLegacyArtByHdrResponseDto
+from model.dto.dashboard_dto import (
+    DashboardStatsResponseDto,
+    DashboardNotebookResponseDto,
+    DashboardLegacyArtResponseDto,
+    DashboardLegacyArtByHdrResponseDto,
+    DashboardRewardLineWithSyncLogDto,
+)
 from model.reward.app_mm_reward_line import AppMmRewardLineResponse
+from model.gitlab_sync_log.app_mm_gitlab_sync_log import AppMmGitlabSyncLogResponse
 
 
 class DashboardService:
@@ -156,7 +163,9 @@ class DashboardService:
 
     @staticmethod
     def get_user_legacy_arts_by_hdr(user_guid: UUID) -> List[DashboardLegacyArtByHdrResponseDto]:
-        """Get legacy arts grouped by reward_hdr for a user."""
+        """Get legacy arts grouped by reward_hdr for a user, with gitlab sync log per reward line."""
+
+        GITLAB_SYNC_LOG_TABLE = "app_mm_gitlab_sync_log"
 
         # 1. Get all reward_hdrs for this user
         reward_hdrs_response = supabase.table(DashboardService.REWARD_HDR_TABLE).select(
@@ -171,15 +180,36 @@ class DashboardService:
             "*"
         ).eq("user_guid", str(user_guid)).execute()
 
+        # 3. Get all gitlab sync logs for this user (keyed by reward_line_guid)
+        sync_logs_response = supabase.table(GITLAB_SYNC_LOG_TABLE).select(
+            "*"
+        ).eq("user_guid", str(user_guid)).filter(
+            "reward_line_guid", "not.is", "null"
+        ).execute()
+
+        # Build map: reward_line_guid -> sync log record
+        sync_log_map: dict = {}
+        for log in sync_logs_response.data:
+            rl_guid = log.get("reward_line_guid")
+            if rl_guid:
+                sync_log_map[rl_guid] = AppMmGitlabSyncLogResponse(**log)
+
         # Group reward_lines by reward_hdr_guid
         lines_by_hdr: dict = {}
         for rl in reward_lines_response.data:
             hdr_guid = rl["reward_hdr_guid"]
             if hdr_guid not in lines_by_hdr:
                 lines_by_hdr[hdr_guid] = []
-            lines_by_hdr[hdr_guid].append(AppMmRewardLineResponse(**rl))
 
-        # 3. Assemble grouped response
+            reward_line = AppMmRewardLineResponse(**rl)
+            gitlab_sync_log = sync_log_map.get(rl["guid"])
+
+            lines_by_hdr[hdr_guid].append(DashboardRewardLineWithSyncLogDto(
+                reward_line=reward_line,
+                gitlab_sync_log=gitlab_sync_log,
+            ))
+
+        # 4. Assemble grouped response
         results: List[DashboardLegacyArtByHdrResponseDto] = []
         for hdr in reward_hdrs_response.data:
             hdr_guid = hdr["guid"]

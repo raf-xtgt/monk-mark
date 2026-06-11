@@ -3,6 +3,7 @@ from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 from model.reward.app_mm_reward_line import AppMmRewardLineResponse
+from model.gitlab_sync_log.app_mm_gitlab_sync_log import AppMmGitlabSyncLogResponse
 
 
 class DashboardStatsResponseDto(BaseModel):
@@ -29,9 +30,14 @@ class DashboardLegacyArtResponseDto(BaseModel):
     notebook_name: str
 
 
+class DashboardRewardLineWithSyncLogDto(BaseModel):
+    reward_line: AppMmRewardLineResponse
+    gitlab_sync_log: Optional[AppMmGitlabSyncLogResponse] = None
+
+
 class DashboardLegacyArtByHdrResponseDto(BaseModel):
     reward_hdr_guid: UUID
     reward_hdr_tier_level: Optional[int] = None
     reward_hdr_library_guid: UUID
     reward_hdr_notebook_guid: UUID
-    reward_lines: List[AppMmRewardLineResponse] = []
+    reward_lines: List[DashboardRewardLineWithSyncLogDto] = []

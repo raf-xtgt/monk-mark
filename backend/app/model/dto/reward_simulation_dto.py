@@ -27,6 +27,14 @@ SIMULATION_TEST_NOTES: List[dict] = [
         "sequence_no": 4,
         "content_text": "\"Easy to replicate\" is the scary part. If 80% of my day is Slack and email, is my career essentially replaceable by anyone with a decent internet connection?",
     },
+    {
+        "sequence_no": 5,
+        "content_text": "Intense concentration is a trained skill, not just motivation. Achieving deep focus requires consistent practice and actively reducing dependence on distraction by embracing boredom.",
+    },
+    {
+        "sequence_no": 6,
+        "content_text": "Email often diminishes our autonomy and attention. We must actively resist its pervasive influence and regain control over how this technology impacts our mental landscape.",
+    },
 ]
 
 SIMULATION_TEST_NOTE_LINKS: List[dict] = [
@@ -45,6 +53,14 @@ SIMULATION_TEST_NOTE_LINKS: List[dict] = [
     {
         "sequence_no": 4,
         "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_3a71be04-f2e2-4719-bc02-e1bfb32c3b0b.jpeg",
+    },
+    {
+        "sequence_no": 5,
+        "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_b5140520-8d1a-4ad2-aeb4-195c0fc75150.jpeg",
+    },
+    {
+        "sequence_no": 6,
+        "image_url": "https://rebzcnrqkaqjbtaiwggw.supabase.co/storage/v1/object/public/file_upload_bucket/notebook_content_image_dir/notebook_content_62b4a9c2-77e2-4782-ba7e-0940d7a1d080.jpeg",
     },
 ]
 
