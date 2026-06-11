@@ -26,7 +26,9 @@ const DashboardLegacyArtListing: React.FC<DashboardLegacyArtListingProps> = ({ a
   const [currentPage, setCurrentPage] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  const items = arts || [];
+  const items = (arts || []).filter(
+    (art) => art.reward_lines && art.reward_lines.length > 0
+  );
   const totalPages = Math.max(Math.ceil(items.length / ITEMS_PER_PAGE), 1);
 
   // Compute page width matching the parent's responsive padding
