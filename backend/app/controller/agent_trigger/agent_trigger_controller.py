@@ -37,6 +37,7 @@ class GitlabAgentOutputResponse(BaseModel):
     issue_url: Optional[str] = None
     branch_result: Optional[str] = None
     mr_result: Optional[str] = None
+    file_url: Optional[str] = None
     visual_motif_result: Optional[str] = None
 
 
@@ -189,6 +190,7 @@ async def trigger_agent(request: AgentTriggerRequest):
                 issue_url=result.gitlab_output.issue_url,
                 branch_result=result.gitlab_output.branch_result,
                 mr_result=result.gitlab_output.mr_result,
+                file_url=result.gitlab_output.file_url,
                 visual_motif_result=result.gitlab_output.visual_motif_result,
             ) if result.gitlab_output else None,
         )
@@ -266,6 +268,7 @@ async def trigger_gitlab_agent(request: GitlabAgentTriggerRequest):
                 issue_url=result.gitlab_output.issue_url,
                 branch_result=result.gitlab_output.branch_result,
                 mr_result=result.gitlab_output.mr_result,
+                file_url=result.gitlab_output.file_url,
                 visual_motif_result=result.gitlab_output.visual_motif_result,
             ) if result.gitlab_output else None,
         )
