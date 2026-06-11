@@ -10,9 +10,11 @@ export const GitLabSyncLogService = {
         notebook_hdr_guid?: string;
         library_hdr_guid?: string;
         llm_chat_hdr_guid?: string;
+        reward_line_guid?: string;
         branch_name?: string;
         issue_url?: string;
         merge_request_url?: string;
+        file_url?: string;
         sync_status?: string;
     }): Promise<any> {
         try {
